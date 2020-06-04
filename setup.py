@@ -14,7 +14,7 @@ with open('requirements.txt') as f:
 setup(
     name='trioswitch',
     version='2020.6.0.dev1',
-    description=u'Async version of the "Battle proven FreeSWITCH Event Socket Protocol client implementation" GreenSWITCH',
+    description=u'Async rewrite of the "Battle proven FreeSWITCH Event Socket Protocol client implementation" GreenSWITCH',
     long_description=readme,
     author=u'Shih-Ping Chan',
     author_email=u'shihping.chan@gmail.com',
@@ -26,11 +26,7 @@ setup(
         'Intended Audience :: Developers',
         'Programming Language :: Python',
         'License :: OSI Approved :: MIT License',
-        'Programming Language :: Python :: 2.7',
-        'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.3',
-        'Programming Language :: Python :: 3.4',
-        'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.8',
     ],
     install_requires=requires
 )
