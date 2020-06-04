@@ -1,2 +1,1 @@
-gevent
-six
+trio

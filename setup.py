@@ -12,13 +12,13 @@ with open('requirements.txt') as f:
     requires = f.readlines()
 
 setup(
-    name='greenswitch',
-    version='0.0.10',
-    description=u'Battle proven FreeSWITCH Event Socket Protocol client implementation with Gevent.',
+    name='trioswitch',
+    version='2020.6.0.dev1',
+    description=u'Async version of the "Battle proven FreeSWITCH Event Socket Protocol client implementation" GreenSWITCH',
     long_description=readme,
-    author=u'Ítalo Rossi',
-    author_email=u'italorossib@gmail.com',
-    url=u'https://github.com/evoluxbr/greenswitch',
+    author=u'Shih-Ping Chan',
+    author_email=u'shihping.chan@gmail.com',
+    # url=u'https://github.com/evoluxbr/greenswitch',
     license=u'MIT',
     packages=find_packages(exclude=('tests', 'docs')),
     classifiers=[
