@@ -14,6 +14,17 @@ References:
 * FreeSWITCH: https://github.com/signalwire/freeswitch
 
 
+Notes
+-----
+
+* The outermost async function, i.e. the "run forever" main function,
+  is the ``connect()`` method of an ``InboundESL`` instance
+
+  We store the nursery, and the trio token, as attributes on the object
+  so the whole caboodle can be cancelled, or methods invoked from alien
+  threads with ``trio.from_thread.run()``.
+
+
 Status
 ------
 
@@ -53,12 +64,15 @@ Inbound example::
 
     # run main loop in a thread so we can control it at the
     # REPL
+    # connect() method is the run forever function
+
+
     def do_1():
         thr = threading.Thread(target=trio.run, args=(conn.connect,))
         thr.setDaemon(True)
         thr.start()
 
-
+    # invoke coroutine functions from an alien thread
     def do_task(task, *args):
         return trio.from_thread.run(task, *args, trio_token=conn.token)
 
