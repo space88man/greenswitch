@@ -39,7 +39,7 @@ Example
 Inbound example::
 
     import trio
-    from greeswitch import esl
+    from trioswitch import esl
     import threading
 
     async def before_fn(self, event):
