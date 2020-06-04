@@ -14,4 +14,4 @@ Trio: https://trio.readthedocs.io/en/stable/
 
 
 from .esl import InboundESL
-from .esl import OutboundESLServer
+from .outbound import OutboundESLServer

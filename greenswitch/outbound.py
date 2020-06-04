@@ -1,9 +1,9 @@
 import errno
-import gevent
 import logging
 import socket
 
 from .esl import ESLProtocol, OutboundSessionHasGoneAway, AsyncResult
+
 
 
 class OutboundSession(ESLProtocol):
