@@ -2,6 +2,14 @@ from typing import Optional
 
 import trio.abc
 
+# Unlike Twisted / asyncio, trio stream abstractions
+# do not have a line reader mode and the ability to switch
+# between line reader and N bytes reader.
+# 
+# This functionality is necessary for Content-Length: followed
+# by N opaque bytes protocols such as HTTP/SIP/FreeSWITCH/RESP3
+# The following implementation is suggested by GH user
+# @alexchamberlain https://github.com/python-trio/trio/issues/796#issuecomment-638143456
 
 class TerminatedFrameReceiver:
     def __init__(
