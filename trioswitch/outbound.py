@@ -1,9 +1,13 @@
 import errno
 import logging
 import socket
+import sys
+import trio.serve_tcp
 
 from .esl import ESLProtocol, OutboundSessionHasGoneAway, AsyncResult
 
+
+gevent = None  # handle linting by faking gevent
 
 
 class OutboundSession(ESLProtocol):
@@ -129,12 +133,13 @@ class OutboundSession(ESLProtocol):
         #   Returning whole event right now
         return event
 
-    async def play_and_get_digits(self, min_digits=None, max_digits=None,
-                            max_attempts=None, timeout=None, terminators=None,
-                            prompt_file=None, error_file=None, variable=None,
-                            digits_regex=None, digit_timeout=None,
-                            transfer_on_fail=None, block=True,
-                            response_timeout=30):
+    async def play_and_get_digits(
+            self, min_digits=None, max_digits=None,
+            max_attempts=None, timeout=None, terminators=None,
+            prompt_file=None, error_file=None, variable=None,
+            digits_regex=None, digit_timeout=None,
+            transfer_on_fail=None, block=True,
+            response_timeout=30):
         args = "%s %s %s %s %s %s %s %s %s %s %s" % (min_digits, max_digits,
                                                      max_attempts, timeout,
                                                      terminators, prompt_file,
@@ -160,8 +165,8 @@ class OutboundSession(ESLProtocol):
         return digit
 
     async def say(self, module_name='en', lang=None, say_type='NUMBER',
-            say_method='pronounced', gender='FEMININE', text=None, block=True,
-            response_timeout=30):
+                  say_method='pronounced', gender='FEMININE', text=None, block=True,
+                  response_timeout=30):
         if lang:
             module_name += ':%s' % lang
 
@@ -178,7 +183,7 @@ class OutboundSession(ESLProtocol):
         self.register_expected_event(expected_event, expected_variable,
                                      expected_variable_value, async_response)
         self.call_command('say', args)
-        #event = await async_response.get(block=True, timeout=response_timeout)
+        # event = await async_response.get(block=True, timeout=response_timeout)
         event = await async_response.wait()
         return event
 
@@ -229,7 +234,17 @@ class OutboundESLServer(object):
                      (self.bind_address, self.bind_port))
         self.bound_port = None
 
-    def listen(self):
+    async def handler(self, stream):
+        pass
+
+    async def listen(self):
+
+        async with trio.open_nursery() as nursery:
+            self.listeners = await nursery.start(trio.serve_tcp, self.handler, self.bind_port)
+
+        logging.info('OutboundESLServer stopped')
+
+    def listenX(self):
         self.server = socket.socket()
         self.server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
