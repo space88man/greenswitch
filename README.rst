@@ -37,7 +37,7 @@ Example
 -------
 
 Inbound example::
-
+    # save to testin.py
     import trio
     from trioswitch import esl
     import threading
@@ -62,21 +62,21 @@ Inbound example::
 
     conn.register_handle("conference::maintenance", handler)
 
-    # run main loop in a thread so we can control it at the
-    # REPL
+    # run trio event loop in a thread so we can control it at the REPL
     # connect() method is the run forever function
-
 
     def do_1():
         thr = threading.Thread(target=trio.run, args=(conn.connect,))
         thr.setDaemon(True)
         thr.start()
 
-    # invoke coroutine functions from an alien thread
-    def do_task(task, *args):
-        return trio.from_thread.run(task, *args, trio_token=conn.token)
+    # invoke coroutine function from an alien thread
+    def do_task(corofn, *args):
+        return trio.from_thread.run(corofn, *args, trio_token=conn.token)
 
-    # python -i thisfile.py
+    # ---- end of testin.py ----
+    
+    # python -i testin.py
     >>> do_1() # connected to FreeSWITCH ESL socket
     >>> do_task(conn.send, "events json CUSTOM conference::maintenance")
     >>> # make a conference call to FreeSWITCH and observe events
