@@ -1,12 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import errno
 import logging
 import pprint
-import sys
 import json
 from typing import Any
+import contextvars
 
 import trio
 from trio .abc import Stream
@@ -14,6 +13,12 @@ from trio .abc import Stream
 from urllib.parse import unquote
 
 from .linereader import TerminatedFrameReceiver
+
+
+LOG = logging.getLogger(__name__)
+
+session_id = contextvars.ContextVar("session_id", default=42)
+
 
 class NotConnectedError(Exception):
     pass
@@ -26,11 +31,11 @@ class OutboundSessionHasGoneAway(Exception):
 class ESLEvent(object):
     def __init__(self, data):
         self.headers = {}
-        if isinstance(data, bytes):
-            data = data.decode()
         self.parse_data(data)
 
     def parse_data(self, data):
+        if not isinstance(data, str):
+            data = data.decode()
         data = unquote(data)
         data = data.strip().splitlines()
         last_key = None
@@ -104,20 +109,24 @@ class ESLProtocol(object):
             del self.event_handlers[name]
 
     async def receive_events(self):
+        self.recv = TerminatedFrameReceiver(stream=self.stream)
         buf = b''
         while self._run:
             try:
                 data = await self.recv.receive()
+            except trio.EndOfChannel:
+                LOG.info("receive_events(),%d: socket is closed", session_id.get())
+                break
             except Exception:
                 self._run = False
                 self.connected = False
                 await self.stream.aclose()
-                # logging.exception("Error reading from socket.")
+                LOG.exception("Exception in receive_events()")
                 break
 
             if not data:
                 if self.connected:
-                    logging.error("Error receiving data, is FreeSWITCH running?")
+                    LOG.error("Error receiving data, is FreeSWITCH running?")
                     self.connected = False
                     self._run = False
                 break
@@ -130,8 +139,12 @@ class ESLProtocol(object):
             buf += data
 
     async def handle_event(self, event):
-        if 'Content-Type' not in event.headers:
-            event.headers['Content-Type'] = 'text/event-text'
+        if 'Event-Name' in event.headers and 'Content-Type' not in event.headers:
+            event.headers['Content-Type'] = 'text/event-plain'
+            event.headers['Content-Length'] = '0'
+        elif 'Content-Type' not in event.headers:
+            event.headers['Content-Type'] = 'text/unknown'
+            event.headers['Content-Length'] = '0'
 
         if event.headers['Content-Type'] == 'auth/request':
             self._auth_request_event.set()
@@ -147,7 +160,7 @@ class ESLProtocol(object):
             async_response.set(event)
         elif event.headers['Content-Type'] == 'text/disconnect-notice':
             if event.headers.get('Content-Disposition') == 'linger':
-                logging.debug('Linger activated')
+                LOG.debug('Linger activated')
                 self._lingering = True
             else:
                 self.connected = False
@@ -190,11 +203,11 @@ class ESLProtocol(object):
         try:
             await handler(event)
         except:
-            logging.exception('ESL %s raised exception.' % handler.__name__)
-            logging.error(pprint.pformat(event.headers))
+            LOG.exception('ESL %s raised exception.' % handler.__name__)
+            LOG.error(pprint.pformat(event.headers))
 
     async def process_events(self):
-        logging.debug('Event Processor Running')
+        LOG.debug('Event Processor Running')
 
         async for event in self._esl_recv_ch:
             if not self._run:
@@ -236,12 +249,7 @@ class ESLProtocol(object):
             except (NotConnectedError,):
                 pass
         self._run = False
-        logging.info("Waiting for receive greenlet exit")
-        self._receive_events_greenlet.join()
-        logging.info("Waiting for event processing greenlet exit")
-        self._process_events_greenlet.join()
-        self.sock.close()
-        self.sock_file.close()
+        self.nursery.cancel_scope.cancel()
 
 
 class InboundESL(ESLProtocol):
@@ -253,13 +261,13 @@ class InboundESL(ESLProtocol):
         self.timeout = 5
         self.connected = False
 
-    async def connect(self):
+    async def run_inbound(self):
 
         self.token = trio.lowlevel.current_trio_token()
         self.stream = await trio.open_tcp_stream(self.host, self.port)
-        self.recv = TerminatedFrameReceiver(stream=self.stream)
         self.connected = True
 
+        LOG.info("Starting InboundESL with %s", self.stream.socket.getpeername())
         async with trio.open_nursery() as self.nursery:
             self.start_event_handlers()
             await self._auth_request_event.wait()

@@ -17,20 +17,31 @@ References:
 Notes
 -----
 
-* The outermost async function, i.e. the "run forever" main function,
-  is the ``connect()`` method of an ``InboundESL`` instance
+* Inbound: The outermost async function, i.e. the "run forever" main function,
+  is the ``run_inbound()`` method of an ``InboundESL`` instance
 
   We store the nursery, and the trio token, as attributes on the object
   so the whole caboodle can be cancelled, or methods invoked from alien
   threads with ``trio.from_thread.run()``.
+* Outbound: The outermost async function, i.e. the "run forever" main function,
+  is the ``listen()`` method of an ``OutboundServer`` instance
+
+  For each incoming connection it starts a child task group with the ``run_outbound()`` method.
+
+.. |ss| raw:: html
+   <strike>
+
+.. |se| raw:: html
+   </strike> 
 
 
 Status
 ------
-
-* inbound working, can receive events in plain or json
+* outbound is working
+* inbound working, can receive events in plain or json, XML
+  not yet supported
 * no tests
-* outbound not working
+* |ss| outbound not working |se|
 
 
 Example
@@ -43,10 +54,10 @@ Inbound example::
     import threading
 
     async def before_fn(self, event):
-        print("This is a before handle")
+        print("This is a before handler")
 
     async def after_fn(self, event):
-        print("This is a after handle")
+        print("This is a after handler")
 
 
     esl.InboundESL.before_handle = before_fn
@@ -63,10 +74,10 @@ Inbound example::
     conn.register_handle("conference::maintenance", handler)
 
     # run trio event loop in a thread so we can control it at the REPL
-    # connect() method is the run forever function
+    # run_inbound() method starts the outermost task group/nursery
 
-    def do_1():
-        thr = threading.Thread(target=trio.run, args=(conn.connect,))
+    def do_inbound():
+        thr = threading.Thread(target=trio.run, args=(conn.run_inbound,))
         thr.setDaemon(True)
         thr.start()
 
@@ -77,6 +88,6 @@ Inbound example::
     # ---- end of testin.py ----
     
     # python -i testin.py
-    >>> do_1() # connected to FreeSWITCH ESL socket
+    >>> do_inbound() # connected to FreeSWITCH ESL socket
     >>> do_task(conn.send, "events json CUSTOM conference::maintenance")
     >>> # make a conference call to FreeSWITCH and observe events

@@ -1,28 +1,42 @@
-import errno
 import logging
-import socket
-import sys
-import trio.serve_tcp
+import trio
+from .esl import (
+    ESLProtocol, OutboundSessionHasGoneAway, AsyncResult,
+    session_id)
 
-from .esl import ESLProtocol, OutboundSessionHasGoneAway, AsyncResult
 
-
+LOG = logging.getLogger(__name__)
 gevent = None  # handle linting by faking gevent
 
 
 class OutboundSession(ESLProtocol):
-    def __init__(self, client_address, sock):
-        super(OutboundSession, self).__init__()
-        self.sock = sock
-        self.sock_file = self.sock.makefile()
+    def __init__(self, stream):
+        super().__init__()
+        self.stream = stream
         self.connected = True
         self.session_data = None
-        self.start_event_handlers()
         self.register_handle('*', self.on_event)
         self.register_handle('CHANNEL_HANGUP', self.on_hangup)
         self.register_handle('DISCONNECT', self.on_disconnect)
         self.expected_events = {}
         self._outbound_connected = False
+
+    async def run_outbound(self, *args):
+        '''Creates the task group/nursery for each incoming connection.
+
+        It starts:
+        * event handling tasks
+        * miscellaneous tasks, such as application run task
+        '''
+        LOG.info(
+            "Starting OutboundSession:%d tasks with %s",
+            session_id.get(),
+            self.stream.socket.getpeername())
+        async with trio.open_nursery() as self.nursery:
+            self.start_event_handlers()
+            for t in args:
+                self.nursery.start_soon(t)
+        LOG.warning("Session %d is terminating", session_id.get())
 
     @property
     def uuid(self):
@@ -36,25 +50,29 @@ class OutboundSession(ESLProtocol):
     def caller_id_number(self):
         return self.session_data.get('Caller-Caller-ID-Number')
 
-    def on_disconnect(self, event):
+    async def on_disconnect(self, event):
         if self._lingering:
-            logging.debug('Socket lingering..')
+            LOG.debug('Socket lingering..')
         elif not self.connected:
-            logging.debug('Socket closed: %s' % event.headers)
-        logging.debug('Raising OutboundSessionHasGoneAway for all pending'
-                      'results')
+            LOG.debug('Socket closed: %s' % event.headers)
+        LOG.debug(
+            'Raising OutboundSessionHasGoneAway for all pending'
+            ' results: %d',
+            len(self.expected_events))
         for event_name in self.expected_events:
+            LOG.debug("No. of events: %s %d", event_name, len(self.expected_events[event_name]))
             for variable, value, async_result in \
                     self.expected_events[event_name]:
                 async_result.set_exception(OutboundSessionHasGoneAway())
 
+        LOG.debug('Raising OutboundSessionHasGoneAway for pending commands: %d', len(self._commands_sent))
         for cmd in self._commands_sent:
             cmd.set_exception(OutboundSessionHasGoneAway())
 
-    def on_hangup(self, event):
-        logging.info('Caller %s has gone away.' % self.caller_id_number)
+    async def on_hangup(self, event):
+        LOG.info('Caller %s has gone away.' % self.caller_id_number)
 
-    def on_event(self, event):
+    async def on_event(self, event):
         # FIXME(italo): Decide if we really need a list of expected events
         # for each expected event. Since we're interacting with the call from
         # just one greenlet we don't have more than one item on this list.
@@ -94,11 +112,13 @@ class OutboundSession(ESLProtocol):
         return await self.send(command)
 
     async def connect(self):
+        '''This is a method override.
+        '''
         if self._outbound_connected:
             return self.session_data
 
         ret = await self.send('connect')
-        resp = await ret.wait()
+        resp = await ret
         self.session_data = resp.headers
         self._outbound_connected = True
 
@@ -107,7 +127,7 @@ class OutboundSession(ESLProtocol):
 
     async def answer(self):
         ret = await self.call_command('answer')
-        resp = await ret.wait()
+        resp = await ret
         return resp.data
 
     async def park(self):
@@ -128,7 +148,7 @@ class OutboundSession(ESLProtocol):
         self.register_expected_event(expected_event, expected_variable,
                                      expected_variable_value, async_response)
         await self.call_command('playback', path)
-        event = await async_response.wait()
+        event = await async_response
         # TODO(italo): Decide what we need to return.
         #   Returning whole event right now
         return event
@@ -148,7 +168,7 @@ class OutboundSession(ESLProtocol):
                                                      digit_timeout,
                                                      transfer_on_fail)
         if not block:
-            self.call_command('play_and_get_digits', args)
+            await self.call_command('play_and_get_digits', args)
             return
 
         async_response = AsyncResult()
@@ -157,8 +177,8 @@ class OutboundSession(ESLProtocol):
         expected_variable_value = "play_and_get_digits"
         self.register_expected_event(expected_event, expected_variable,
                                      expected_variable_value, async_response)
-        self.call_command('play_and_get_digits', args)
-        event = await async_response.wait()
+        await self.call_command('play_and_get_digits', args)
+        event = await async_response
         if not event:
             return
         digit = event.headers.get('variable_%s' % variable)
@@ -173,7 +193,7 @@ class OutboundSession(ESLProtocol):
         args = "%s %s %s %s %s" % (module_name, say_type, say_method, gender,
                                    text)
         if not block:
-            self.call_command('say', args)
+            await self.call_command('say', args)
             return
 
         async_response = AsyncResult()
@@ -182,9 +202,9 @@ class OutboundSession(ESLProtocol):
         expected_variable_value = "say"
         self.register_expected_event(expected_event, expected_variable,
                                      expected_variable_value, async_response)
-        self.call_command('say', args)
+        await self.call_command('say', args)
         # event = await async_response.get(block=True, timeout=response_timeout)
-        event = await async_response.wait()
+        event = await async_response
         return event
 
     def register_expected_event(self, expected_event, expected_variable,
@@ -215,13 +235,8 @@ class OutboundESLServer(object):
     def __init__(self, bind_address='127.0.0.1', bind_port=8000,
                  application=None, max_connections=100):
         self.bind_address = bind_address
-        if not isinstance(bind_port, (list, tuple)):
-            bind_port = [bind_port]
-        if not bind_port:
-            raise ValueError('bind_port must be a string or list with port '
-                             'numbers')
-
         self.bind_port = bind_port
+
         self.max_connections = max_connections
         self.connection_count = 0
         if not application:
@@ -230,93 +245,39 @@ class OutboundESLServer(object):
         self._greenlets = set()
         self._running = False
         self.server = None
-        logging.info('Starting OutboundESLServer at %s:%s' %
-                     (self.bind_address, self.bind_port))
         self.bound_port = None
+        self.idx = 0
 
     async def handler(self, stream):
-        pass
+        '''This method handles each incoming connection.
+
+        It launches the event session and user application and blocks
+        until those terminate.
+        '''
+        LOG.debug("Loading session %d %s", self.idx, stream.socket.getpeername())
+        session_id.set(self.idx)
+        self.idx += 1
+        session = OutboundSession(stream)
+        app = self.application(session)
+        await session.run_outbound(app.run)
 
     async def listen(self):
+        '''Creates the root task group/nursery.
+        It should be run from trio.run.
+
+        It blocks until the task group/nursery is cancelled.
+        '''
+
+        LOG.info(
+            'Starting OutboundESLServer at %s:%s' %
+            (self.bind_address, self.bind_port))
 
         async with trio.open_nursery() as nursery:
             self.listeners = await nursery.start(trio.serve_tcp, self.handler, self.bind_port)
+            LOG.info('OutboundESLServer listeners started')
 
-        logging.info('OutboundESLServer stopped')
-
-    def listenX(self):
-        self.server = socket.socket()
-        self.server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-
-        for port in self.bind_port:
-            try:
-                self.server.bind((self.bind_address, port))
-                self.bound_port = port
-                break
-            except socket.error:
-                logging.info('Failed to bind to port %s, '
-                             'trying next in range...' % port)
-                continue
-        if not self.bound_port:
-            logging.error('Could not bind server, no ports available.')
-            sys.exit()
-        logging.info('Successfully bound to port %s' % self.bound_port)
-        self.server.setblocking(0)
-        self.server.listen(100)
-        self._running = True
-
-        while self._running:
-            try:
-                sock, client_address = self.server.accept()
-            except socket.error as error:
-                if error.args[0] in (errno.EWOULDBLOCK, errno.EAGAIN):
-                    # no data available
-                    gevent.sleep(0.1)
-                    continue
-                raise
-
-            session = OutboundSession(client_address, sock)
-            gevent.spawn(self._accept_call, session)
-
-        logging.info('Closing socket connection...')
-        self.server.shutdown(socket.SHUT_RD)
-        self.server.close()
-
-        logging.info('Waiting for calls to be ended. Currently, there are '
-                     '%s active calls' % self.connection_count)
-        gevent.joinall(self._greenlets)
-        self._greenlets.clear()
-
-        logging.info('OutboundESLServer stopped')
-
-    def _accept_call(self, session):
-        if self.connection_count >= self.max_connections:
-            logging.info(
-                'Rejecting call, server is at full capacity, current '
-                'connection count is %s/%s' %
-                (self.connection_count, self.max_connections))
-            session.connect()
-            session.stop()
-            return
-
-        self._handle_call(session)
-
-    def _handle_call(self, session):
-        session.connect()
-        app = self.application(session)
-        handler = gevent.spawn(app.run)
-        self._greenlets.add(handler)
-        handler.session = session
-        handler.link(self._handle_call_finish)
-        self.connection_count += 1
-        logging.debug('Connection count %d' % self.connection_count)
-
-    def _handle_call_finish(self, handler):
-        logging.info('Call from %s ended' % handler.session.caller_id_number)
-        self._greenlets.remove(handler)
-        self.connection_count -= 1
-        logging.debug('Connection count %d' % self.connection_count)
-        handler.session.stop()
+        LOG.info('OutboundESLServer stopped')
 
     def stop(self):
+        self.nursery.cancel_scope.cancel()
         self._running = False
