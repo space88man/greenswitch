@@ -50,20 +50,21 @@ class AsyncResult:
     def __init__(self):
         self._event = trio.Event()
         self._value = None
+        self._exception = None
     
     def set(self, value: Any) -> None:
         self._value = value
         self._event.set()
 
-    async def wait(self) -> Any:
+    async def _coro(self) -> None:
         await self._event.wait()
-        return self._value
 
     def set_exception(self, exc: Exception) -> None:
         self._exception = exc
 
-    async def get(self, block=True, timeout=-1) -> Any:
-        pass
+    def __await__(self):
+        yield from self._coro().__await__()
+        return self._value
 
 
 class ESLProtocol(object):
@@ -224,7 +225,7 @@ class ESLProtocol(object):
             raise NotConnectedError()
         async_response = AsyncResult()
         self._commands_sent.append(async_response)
-        raw_msg = (data + EOL*2).encode('utf-8')
+        raw_msg = (data + EOL * 2).encode('utf-8')
         await self.stream.send_all(raw_msg)
         return async_response
 
@@ -232,7 +233,7 @@ class ESLProtocol(object):
         if self.connected:
             try:
                 await self.send('exit')
-            except (NotConnectedError, socket.error):
+            except (NotConnectedError,):
                 pass
         self._run = False
         logging.info("Waiting for receive greenlet exit")
@@ -256,7 +257,7 @@ class InboundESL(ESLProtocol):
 
         self.token = trio.lowlevel.current_trio_token()
         self.stream = await trio.open_tcp_stream(self.host, self.port)
-        self.recv = TerminatedFrameReceiver(stream = self.stream)
+        self.recv = TerminatedFrameReceiver(stream=self.stream)
         self.connected = True
 
         async with trio.open_nursery() as self.nursery:
@@ -264,13 +265,13 @@ class InboundESL(ESLProtocol):
             await self._auth_request_event.wait()
             if not self.connected:
                 raise NotConnectedError('Server closed connection, check '
-                                    'FreeSWITCH config.')
+                                        'FreeSWITCH config.')
             await self.authenticate()
             print("Ready to process events...")
 
     async def authenticate(self):
         ret = await self.send('auth %s' % self.password)
-        response = await ret.wait()
+        response = await ret
         if response.headers['Reply-Text'] != '+OK accepted':
             raise ValueError('Invalid password.')
 
