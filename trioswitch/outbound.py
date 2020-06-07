@@ -1,12 +1,15 @@
 import logging
 import trio
 from .esl import (
-    ESLProtocol, OutboundSessionHasGoneAway, AsyncResult,
+    ESLProtocol, AsyncResult,
     session_id)
 
 
 LOG = logging.getLogger(__name__)
-gevent = None  # handle linting by faking gevent
+
+
+class OutboundSessionHasGoneAway(Exception):
+    pass
 
 
 class OutboundSession(ESLProtocol):
@@ -82,10 +85,13 @@ class OutboundSession(ESLProtocol):
 
         for expected_event in self.expected_events[event_name]:
             event_variable, expected_value, async_response = expected_event
+            # If event_variable is YYYYYYYY match on 
+            # YYYYYYYY: xxxxxxxx or
+            # variable_YYYYYYYY: xxxxxxxx
             expected_variable = 'variable_%s' % event_variable
-            if expected_variable not in event.headers:
+            if event_variable not in event.headers and expected_variable not in event.headers:
                 return
-            elif expected_value == event.headers.get(expected_variable):
+            elif expected_value == event.headers.get(event_variable, event.headers.get(expected_variable)):
                 async_response.set(event)
                 self.expected_events[event_name].remove(expected_event)
 
@@ -112,15 +118,20 @@ class OutboundSession(ESLProtocol):
         return await self.send(command)
 
     async def connect(self):
-        '''This is a method override.
+        '''FreeSWITCH will reply with a CHANNEL_DATA event
+        which contains information about the incoming call.
         '''
         if self._outbound_connected:
             return self.session_data
 
         ret = await self.send('connect')
-        resp = await ret
+        resp = await ret #  expect Event-Name: CHANNEL_DATA
         self.session_data = resp.headers
         self._outbound_connected = True
+
+        LOG.debug(
+            "Incoming call from %s to %s", resp.headers['Channel-Caller-ID-Name'],
+            resp.headers['Channel-Destination-Number'])
 
     async def myevents(self):
         await self.send('myevents')
@@ -141,9 +152,14 @@ class OutboundSession(ESLProtocol):
             await self.call_command('playback', path)
             return
 
+        # FreeSWITCH event contains both:
+        #
+        # variable_current_application: playback
+        # Application: playback
         async_response = AsyncResult()
         expected_event = "CHANNEL_EXECUTE_COMPLETE"
-        expected_variable = "current_application"
+        # match on Application: or variable_current_application:
+        expected_variable = "Application"
         expected_variable_value = "playback"
         self.register_expected_event(expected_event, expected_variable,
                                      expected_variable_value, async_response)
@@ -242,7 +258,7 @@ class OutboundESLServer(object):
         if not application:
             raise ValueError('You need an Application to control your calls.')
         self.application = application
-        self._greenlets = set()
+
         self._running = False
         self.server = None
         self.bound_port = None

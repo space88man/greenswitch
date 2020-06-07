@@ -43,7 +43,7 @@ class MyApplication(object):
         await self.session.connect()
         print("connect")
 
-        # await self.session.myevents()
+        await self.session.myevents()
         print("myevents")
 
         await self.session.linger()
@@ -55,10 +55,11 @@ class MyApplication(object):
 
         # Now block until the end of the file. pass block=False to
         # return immediately.
-        await self.session.playback('local_stream://moh', block=False)
+        # await self.session.playback('local_stream://moh', block=False)
+        await self.session.playback('/usr/local/freeswitch/media/output.wav')
         print("playback")
 
-        await trio.sleep(10.0)
+        await trio.sleep(5.0)
 
         await self.session.call_command('break')
         print("break")

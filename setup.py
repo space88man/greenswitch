@@ -13,13 +13,13 @@ with open('requirements.txt') as f:
 
 setup(
     name='trioswitch',
-    version='2020.6.0.dev1',
-    description=u'Async rewrite of the "Battle proven FreeSWITCH Event Socket Protocol client implementation" GreenSWITCH',
+    version='2020.6.0.dev2',
+    description='Async rewrite of the "Battle proven FreeSWITCH Event Socket Protocol client implementation" GreenSWITCH',
     long_description=readme,
-    author=u'Shih-Ping Chan',
-    author_email=u'shihping.chan@gmail.com',
+    author='Shih-Ping Chan',
+    author_email='shihping.chan@gmail.com',
     # url=u'https://github.com/evoluxbr/greenswitch',
-    license=u'MIT',
+    license='MIT',
     packages=find_packages(exclude=('tests', 'docs')),
     classifiers=[
         'Development Status :: 5 - Production/Stable',

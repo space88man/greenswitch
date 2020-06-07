@@ -8,7 +8,7 @@ from typing import Any
 import contextvars
 
 import trio
-from trio .abc import Stream
+from trio.abc import Stream
 
 from urllib.parse import unquote
 
@@ -21,10 +21,6 @@ session_id = contextvars.ContextVar("session_id", default=42)
 
 
 class NotConnectedError(Exception):
-    pass
-
-
-class OutboundSessionHasGoneAway(Exception):
     pass
 
 
@@ -51,11 +47,15 @@ class ESLEvent(object):
 
 
 class AsyncResult:
+    '''Awaitable, to hold the result of an RPC call.
+    The result is ready when the _event member
+    has been set.
+    '''
 
     def __init__(self):
-        self._event = trio.Event()
-        self._value = None
-        self._exception = None
+        self._event: trio.Event = trio.Event()
+        self._value: Any = None
+        self._exception: Exception = None
     
     def set(self, value: Any) -> None:
         self._value = value
@@ -67,8 +67,10 @@ class AsyncResult:
     def set_exception(self, exc: Exception) -> None:
         self._exception = exc
 
-    def __await__(self):
+    def __await__(self) -> Any:
         yield from self._coro().__await__()
+        if self._exception:
+            raise self._exception
         return self._value
 
 
@@ -78,8 +80,6 @@ class ESLProtocol(object):
         self._EOL = b'\n'
         self._commands_sent = []
         self._auth_request_event = trio.Event()
-        # self._receive_events_greenlet = None
-        # self._process_events_greenlet = None
         self.event_handlers = {}
         self._esl_send_ch, self._esl_recv_ch = trio.open_memory_channel(0)
         self._process_esl_event_queue = True
