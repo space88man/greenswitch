@@ -25,12 +25,13 @@ References:
   For each incoming connection it starts a child task group with the ``run_outbound()`` method.
 
 
-## Status
+## Status 2020-06-07
 
 * basic outbound is working
 * inbound working, can receive events in plain or json, XML
   not yet supported
 * no tests
+* greenlets stuff still lurking around (unused but not cleaned up)
 * ~~no outbound~~
 
 
@@ -80,4 +81,7 @@ Inbound example:
     # python -i testin.py
     >>> do_inbound() # connected to FreeSWITCH ESL socket
     >>> do_task(conn.send, "events json CUSTOM conference::maintenance")
-    >>> # make a conference call to FreeSWITCH and observe events
+
+    # make a conference call to FreeSWITCH and observe events;
+    # in the default FreeSWITCH config you could call #3500 with any SIP
+    # UA without REGISTER
