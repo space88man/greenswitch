@@ -28,12 +28,6 @@ Notes
 
   For each incoming connection it starts a child task group with the ``run_outbound()`` method.
 
-.. |ss| raw:: html
-   <strike>
-
-.. |se| raw:: html
-   </strike> 
-
 
 Status
 ------
@@ -41,13 +35,13 @@ Status
 * inbound working, can receive events in plain or json, XML
   not yet supported
 * no tests
-* |ss| outbound not working |se|
 
 
 Example
 -------
 
 Inbound example::
+
     # save to testin.py
     import trio
     from trioswitch import esl
