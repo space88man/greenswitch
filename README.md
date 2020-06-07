@@ -1,21 +1,17 @@
-TrioSWITCH: FreeSWITCH Event Socket Protocol
-=============================================
+# TrioSWITCH: FreeSWITCH Event Socket Protocol
 
-In the aioswitch* branches we are doing a rewrite of GreenSWITCH using
+In the aioswitch\* branches we are doing a rewrite of GreenSWITCH using
 trio as async/await framework.
 
 
 References:
 
 * GreenSWITCH: https://github.com/EvoluxBR/greenswitch
-
 * Trio: https://github.com/python-trio/trio
-
 * FreeSWITCH: https://github.com/signalwire/freeswitch
 
 
-Notes
------
+## Notes
 
 * Inbound: The outermost async function, i.e. the "run forever" main function,
   is the ``run_inbound()`` method of an ``InboundESL`` instance
@@ -29,18 +25,18 @@ Notes
   For each incoming connection it starts a child task group with the ``run_outbound()`` method.
 
 
-Status
-------
-* outbound is working
+## Status
+
+* basic outbound is working
 * inbound working, can receive events in plain or json, XML
   not yet supported
 * no tests
+* ~~no outbound~~
 
 
-Example
--------
+## Example
 
-Inbound example::
+Inbound example:
 
     # save to testin.py
     import trio
