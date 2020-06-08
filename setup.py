@@ -5,7 +5,7 @@
 from setuptools import setup, find_packages
 
 
-with open('README.rst') as f:
+with open('README.md') as f:
     readme = f.read()
 
 with open('requirements.txt') as f:
@@ -13,7 +13,7 @@ with open('requirements.txt') as f:
 
 setup(
     name='trioswitch',
-    version='2020.6.0.dev2',
+    version='2020.6.0.dev3',
     description='Async rewrite of the "Battle proven FreeSWITCH Event Socket Protocol client implementation" GreenSWITCH',
     long_description=readme,
     author='Shih-Ping Chan',

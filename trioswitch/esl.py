@@ -261,7 +261,7 @@ class InboundESL(ESLProtocol):
         self.timeout = 5
         self.connected = False
 
-    async def run_inbound(self):
+    async def run_inbound(self, *, task_status=trio.TASK_STATUS_IGNORED):
 
         self.token = trio.lowlevel.current_trio_token()
         self.stream = await trio.open_tcp_stream(self.host, self.port)
@@ -276,6 +276,8 @@ class InboundESL(ESLProtocol):
                                         'FreeSWITCH config.')
             await self.authenticate()
             print("Ready to process events...")
+
+            task_status.started()
 
     async def authenticate(self):
         ret = await self.send('auth %s' % self.password)
