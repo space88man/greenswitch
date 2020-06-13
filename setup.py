@@ -13,7 +13,7 @@ with open('requirements.txt') as f:
 
 setup(
     name='trioswitch',
-    version='2020.7.0',
+    version='2020.7.1.dev1',
     description='Async rewrite of the "Battle proven FreeSWITCH Event Socket Protocol client implementation" GreenSWITCH',
     long_description=readme,
     author='Shih-Ping Chan',

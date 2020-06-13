@@ -34,6 +34,12 @@ References:
 * greenlets stuff still lurking around (unused but not cleaned up)
 * ~~no outbound~~
 
+## TODO
+
+* Add tests
+* Clean up Context Manager
+* Events in XML (does anyone actually use this?)
+
 
 ## Example
 
