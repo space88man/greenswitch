@@ -28,13 +28,12 @@ class MyApplication(object):
     def __init__(self, session):
         self.session = session
 
-        self.session.register_handle('*', self.pr_event)
+        self.session.register_handle("*", self.pr_event)
 
     async def pr_event(self, event):
         print(json.dumps(event.headers, indent=4))
-        if hasattr(event, 'data'):
+        if hasattr(event, "data"):
             print(event.data)
-    
 
     async def run(self):
         """
@@ -52,21 +51,20 @@ class MyApplication(object):
         await self.session.answer()
         print("answer")
 
-
         # Now block until the end of the file. pass block=False to
         # return immediately.
         # await self.session.playback('local_stream://moh', block=False)
-        await self.session.playback('/usr/local/freeswitch/media/output.wav')
+        await self.session.playback("/usr/local/freeswitch/media/output.wav")
         print("playback")
 
         await trio.sleep(5.0)
 
-        await self.session.call_command('break')
+        await self.session.call_command("break")
         print("break")
 
         await trio.sleep(1.0)
 
-        await self.session.call_command('hangup')
+        await self.session.call_command("hangup")
         print("hangup")
 
         await trio.sleep(2.0)
@@ -75,10 +73,11 @@ class MyApplication(object):
 
 
 server = outbound.OutboundESLServer(
-    bind_address='127.0.0.1',
+    bind_address="127.0.0.1",
     bind_port=8084,
     application=MyApplication,
-    max_connections=5)
+    max_connections=5,
+)
 
 
 thr = threading.Thread(target=trio.run, args=(server.listen,))
