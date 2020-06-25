@@ -106,13 +106,10 @@ class ESLProtocol(object):
         LOG.debug("Network task running")
 
         buf = b""
-        # async with await connect_tcp(self.host, self.port) as self.client:
-
         while self._run:
             try:
                 # anyio does not include delimiter in data
                 data = await self.client.receive_until(self._EOL, 16384)
-                # print(data, len(data))
             except Exception:
                 self._run = False
                 self.connected = False
