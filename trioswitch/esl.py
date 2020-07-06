@@ -235,6 +235,8 @@ class ESLProtocol(object):
                 await self.send("exit")
             except (NotConnectedError,):
                 pass
+            finally:
+                self.connected = False
         self._run = False
         await self.tg.cancel_scope.cancel()
 
@@ -270,9 +272,3 @@ class InboundESL(ESLProtocol):
 
         LOG.info("Authentication to FreeSWITCH succeeded")
 
-    def __enter__(self):
-        self.connect()
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.stop()
