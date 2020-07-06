@@ -8,10 +8,8 @@ from trioswitch import InboundESL
 @pytest.mark.anyio
 async def test_connect(server, esl):
     """Should connect to FreeSWITCH ESL Server."""
-
     async with create_task_group() as tg:
         await tg.spawn(server.start_server)
-
         await sleep(0.1)
         await tg.spawn(esl.run_inbound)
         await sleep(0.1)
@@ -31,12 +29,10 @@ async def test_connect_wrong_password(server, esl):
     with pytest.raises(ValueError):
         async with create_task_group() as tg:
             await tg.spawn(server.start_server)
-
             await sleep(0.1)
-
             await tg.spawn(esl.run_inbound)
-
             await sleep(0.1)
+
     print("==== asserts test_connect_wrong_password ====")
     assert not esl.connected
     await esl.stop()
@@ -48,7 +44,6 @@ async def test_client_disconnect(server, esl):
     async with create_task_group() as tg:
         await tg.spawn(server.start_server)
         await sleep(0.1)
-
         await tg.spawn(esl.run_inbound)
         await sleep(0.1)
 
@@ -66,67 +61,69 @@ async def test_z_server_disconnect(server, esl):
     async with create_task_group() as tg:
         await tg.spawn(server.start_server)
         await sleep(0.1)
-
         await tg.spawn(esl.run_inbound)
         await sleep(0.1)
 
         await server.stop()
-
         await sleep(0.1)
+
         print("==== asserts test_z_server_disconnect ====", esl._run, esl.connected)
         assert not esl.connected
 
         await esl.stop()
 
 
-@pytest.mark.anyio
-async def test_register_unregister_handle(esl):
+def test_register_unregister_handle(esl):
     """Should register/unregister handler for events."""
+
     def handle(event):
         pass
 
     print("==== asserts test_register_unregister_handle ====")
-    esl.register_handle('TEST_EVENT', handle)
-    
-    assert handle in esl.event_handlers['TEST_EVENT']
-    esl.unregister_handle('TEST_EVENT', handle)
-    assert 'TEST_EVENT' not in esl.event_handlers
+    esl.register_handle("TEST_EVENT", handle)
+
+    assert handle in esl.event_handlers["TEST_EVENT"]
+    esl.unregister_handle("TEST_EVENT", handle)
+    assert "TEST_EVENT" not in esl.event_handlers
 
 
-@pytest.mark.anyio
-async def test_register_a_registered_handle(esl):
+def test_register_a_registered_handle(esl):
     """Should not register the same handler to same event."""
+
     def handle(event):
         pass
-    esl.register_handle('TEST_EVENT', handle)
-    esl.register_handle('TEST_EVENT', handle)
-    assert [handle] == esl.event_handlers['TEST_EVENT']
+
+    esl.register_handle("TEST_EVENT", handle)
+    esl.register_handle("TEST_EVENT", handle)
+    assert [handle] == esl.event_handlers["TEST_EVENT"]
 
 
-@pytest.mark.anyio
-async def test_unregister_a_not_registered_handle(esl):
+def test_unregister_a_not_registered_handle(esl):
     """Should raise ValueError when unregistering an unknown handler."""
+
     def handle(event):
         pass
+
     with pytest.raises(ValueError):
-        esl.unregister_handle('TEST_EVENT', handle)
+        esl.unregister_handle("TEST_EVENT", handle)
 
 
 @pytest.mark.anyio
 async def test_custom_event(server, esl):
     """Should call registered handler for CUSTOM events."""
+
     def on_sofia_pre_register(self, event):
         self.pre_register = True
 
     esl.pre_register = False
-    esl.on_sofia_pre_register = types.MethodType(
-        on_sofia_pre_register, esl)
+    esl.on_sofia_pre_register = types.MethodType(on_sofia_pre_register, esl)
 
-    esl.register_handle('sofia::pre_register',
-                                esl.on_sofia_pre_register)
-    event_plain = dedent("""\
+    esl.register_handle("sofia::pre_register", esl.on_sofia_pre_register)
+    event_plain = dedent(
+        """\
         Event-Name: CUSTOM
-        Event-Subclass: sofia::pre_register""")
+        Event-Subclass: sofia::pre_register"""
+    )
 
     async with create_task_group() as tg:
         await tg.spawn(server.start_server)
@@ -134,8 +131,7 @@ async def test_custom_event(server, esl):
         await tg.spawn(esl.run_inbound)
         await sleep(0.1)
 
-        await server.fake_event_plain(server.clients[0], event_plain.encode()
-        )
+        await server.fake_event_plain(server.clients[0], event_plain.encode())
         await sleep(0.1)
 
         await esl.stop()
@@ -148,15 +144,16 @@ async def test_custom_event(server, esl):
 @pytest.mark.anyio
 async def test_event(server, esl):
     """Should call registered handler for events."""
+
     def on_heartbeat(self, event):
         self.heartbeat = True
 
     esl.heartbeat = False
-    esl.on_heartbeat = types.MethodType(
-        on_heartbeat, esl)
+    esl.on_heartbeat = types.MethodType(on_heartbeat, esl)
 
-    esl.register_handle('HEARTBEAT', esl.on_heartbeat)
-    event_plain = dedent("""\
+    esl.register_handle("HEARTBEAT", esl.on_heartbeat)
+    event_plain = dedent(
+        """\
         Event-Name: HEARTBEAT
         Core-UUID: cb2d5146-9a99-11e4-9291-092b1a87b375
         FreeSWITCH-Hostname: evoluxdev
@@ -182,7 +179,8 @@ async def test_event(server, esl):
         Session-Since-Startup: 34
         Session-Peak-Max: 4
         Session-Peak-FiveMin: 0
-        Idle-CPU: 98.700000\n\n""")
+        Idle-CPU: 98.700000\n\n"""
+    )
 
     async with create_task_group() as tg:
         await tg.spawn(server.start_server)
@@ -207,8 +205,10 @@ async def test_event_socket_data(server, esl):
 
     def on_log(event):
         esl.log = True
-    esl.register_handle('log', on_log)
-    event_plain = dedent("""\
+
+    esl.register_handle("log", on_log)
+    event_plain = dedent(
+        """\
         Content-Type: log/data
         Content-Length: 126
         Log-Level: 7
@@ -219,7 +219,8 @@ async def test_event_socket_data(server, esl):
         User-Data: 4c882cc4-cd02-11e6-8b82-395b501876f9
 
         2016-12-28 10:34:08.398763 [DEBUG] switch_core_state_machine.c:710 (sofia/internal/7071@devitor) State DESTROY going to sleep
-""")
+"""
+    )
     async with create_task_group() as tg:
         await tg.spawn(server.start_server)
         await sleep(0.1)
@@ -239,17 +240,18 @@ async def test_event_socket_data(server, esl):
 @pytest.mark.anyio
 async def test_event_with_multiline_channel_variables_content(server, esl):
     """Should not break parse from ESL Event when."""
+
     def on_channel_create(self, event):
         self.channel_create = True
         self.parsed_event = event
 
     esl.channel_create = False
     esl.parsed_event = None
-    esl.on_channel_create = types.MethodType(
-        on_channel_create, esl)
+    esl.on_channel_create = types.MethodType(on_channel_create, esl)
 
-    esl.register_handle('CHANNEL_CREATE', esl.on_channel_create)
-    event_plain = dedent("""\
+    esl.register_handle("CHANNEL_CREATE", esl.on_channel_create)
+    event_plain = dedent(
+        """\
         Event-Name: CHANNEL_CREATE
         Core-UUID: ed56dab6-a6fc-11e4-960f-6f83a2e5e50a
         FreeSWITCH-Hostname: evoluxdev
@@ -400,9 +402,11 @@ async def test_event_with_multiline_channel_variables_content(server, esl):
         a=fmtp:101 0-15
         a=rtcp:4017 IN IP4 172.16.7.70
 
-        variable_endpoint_disposition: DELAYED NEGOTIATION""")
+        variable_endpoint_disposition: DELAYED NEGOTIATION"""
+    )
 
-    expected_variable_value = dedent("""\
+    expected_variable_value = dedent(
+        """\
         v=0
         o=- 3631463817 3631463817 IN IP4 172.16.7.70
         s=pjmedia
@@ -423,9 +427,9 @@ async def test_event_with_multiline_channel_variables_content(server, esl):
         a=rtpmap:9 G722/8000
         a=rtpmap:101 telephone-event/8000
         a=fmtp:101 0-15
-        a=rtcp:4017 IN IP4 172.16.7.70""")
+        a=rtcp:4017 IN IP4 172.16.7.70"""
+    )
 
-    
     async with create_task_group() as tg:
         await tg.spawn(server.start_server)
         await sleep(0.1)
@@ -439,7 +443,7 @@ async def test_event_with_multiline_channel_variables_content(server, esl):
         await server.stop()
 
     print("==== asserts test_event_with_multiline_channel_variables_content ====")
-    assert esl.parsed_event.headers['variable_switch_r_sdp'] == expected_variable_value
+    assert esl.parsed_event.headers["variable_switch_r_sdp"] == expected_variable_value
 
 
 @pytest.mark.anyio
@@ -451,14 +455,14 @@ async def test_api_response(server, esl):
         await tg.spawn(esl.run_inbound)
         await sleep(0.1)
 
-        response = await (await esl.send('api khomp show links concise'))
+        response = await (await esl.send("api khomp show links concise"))
         await esl.stop()
         await server.stop()
 
     print("==== test_api_response ==== ")
-    assert 'api/response' == response.headers['Content-Type']
-    assert 'Content-Length' in response.headers
-    assert len(response.data) == int(response.headers['Content-Length'])
+    assert "api/response" == response.headers["Content-Type"]
+    assert "Content-Length" in response.headers
+    assert len(response.data) == int(response.headers["Content-Length"])
 
 
 @pytest.mark.anyio
@@ -470,14 +474,13 @@ async def test_command_not_found(server, esl):
         await tg.spawn(esl.run_inbound)
         await sleep(0.1)
 
-        response = await (await esl.send('unknown_command'))
+        response = await (await esl.send("unknown_command"))
         await esl.stop()
         await server.stop()
 
-
     print("==== test_command_not_found ==== ")
-    assert 'command/reply' == response.headers['Content-Type']
-    assert '-ERR command not found' ==  response.headers['Reply-Text']
+    assert "command/reply" == response.headers["Content-Type"]
+    assert "-ERR command not found" == response.headers["Reply-Text"]
 
 
 @pytest.mark.anyio
@@ -489,7 +492,9 @@ async def test_event_without_handler(server, esl):
         await tg.spawn(esl.run_inbound)
         await sleep(0.1)
 
-        await server.fake_event_plain(server.clients[0], 'Event-Name: EVENT_UNKNOWN'.encode())
+        await server.fake_event_plain(
+            server.clients[0], "Event-Name: EVENT_UNKNOWN".encode()
+        )
         await sleep(0.1)
 
         print("==== test_command_not_found ==== ")
