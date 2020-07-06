@@ -6,9 +6,9 @@ from trioswitch import InboundESL
 
 
 @pytest.mark.anyio
-async def test_connect(server):
+async def test_connect(server, esl):
     """Should connect to FreeSWITCH ESL Server."""
-    esl = InboundESL('127.0.0.1', 8022, "ClueCon")
+
     async with create_task_group() as tg:
         await tg.spawn(server.start_server)
 
@@ -25,9 +25,9 @@ async def test_connect(server):
 
 
 @pytest.mark.anyio
-async def test_connect_wrong_password(server):
+async def test_connect_wrong_password(server, esl):
     """Should raises ValueError when using wrong ESL password."""
-    esl = InboundESL('127.0.0.1', 8022, "wrongpassword")
+    esl.password = "wrongpassword"
     with pytest.raises(ValueError):
         async with create_task_group() as tg:
             await tg.spawn(server.start_server)
@@ -44,8 +44,7 @@ async def test_connect_wrong_password(server):
 
 
 @pytest.mark.anyio
-async def test_client_disconnect(server):
-    esl = InboundESL('127.0.0.1', 8022, "ClueCon")
+async def test_client_disconnect(server, esl):
     async with create_task_group() as tg:
         await tg.spawn(server.start_server)
         await sleep(0.1)
@@ -62,9 +61,8 @@ async def test_client_disconnect(server):
 
 
 @pytest.mark.anyio
-async def test_z_server_disconnect(server):
+async def test_z_server_disconnect(server, esl):
     """Should detect server disconnection."""
-    esl = InboundESL('127.0.0.1', 8022, "ClueCon")
     async with create_task_group() as tg:
         await tg.spawn(server.start_server)
         await sleep(0.1)
@@ -82,9 +80,8 @@ async def test_z_server_disconnect(server):
 
 
 @pytest.mark.anyio
-async def test_register_unregister_handle():
+async def test_register_unregister_handle(esl):
     """Should register/unregister handler for events."""
-    esl = InboundESL('127.0.0.1', 8022, "ClueCon")
     def handle(event):
         pass
 
@@ -97,9 +94,8 @@ async def test_register_unregister_handle():
 
 
 @pytest.mark.anyio
-async def test_register_a_registered_handle():
+async def test_register_a_registered_handle(esl):
     """Should not register the same handler to same event."""
-    esl = InboundESL('127.0.0.1', 8022, "ClueCon")
     def handle(event):
         pass
     esl.register_handle('TEST_EVENT', handle)
@@ -108,9 +104,8 @@ async def test_register_a_registered_handle():
 
 
 @pytest.mark.anyio
-async def test_unregister_a_not_registered_handle():
+async def test_unregister_a_not_registered_handle(esl):
     """Should raise ValueError when unregistering an unknown handler."""
-    esl = InboundESL('127.0.0.1', 8022, "ClueCon")
     def handle(event):
         pass
     with pytest.raises(ValueError):
@@ -118,9 +113,8 @@ async def test_unregister_a_not_registered_handle():
 
 
 @pytest.mark.anyio
-async def test_custom_event(server):
+async def test_custom_event(server, esl):
     """Should call registered handler for CUSTOM events."""
-    esl = InboundESL('127.0.0.1', 8022, "ClueCon")
     def on_sofia_pre_register(self, event):
         self.pre_register = True
 
@@ -152,9 +146,8 @@ async def test_custom_event(server):
 
 
 @pytest.mark.anyio
-async def test_event(server):
+async def test_event(server, esl):
     """Should call registered handler for events."""
-    esl = InboundESL('127.0.0.1', 8022, "ClueCon")
     def on_heartbeat(self, event):
         self.heartbeat = True
 
@@ -208,9 +201,8 @@ async def test_event(server):
 
 
 @pytest.mark.anyio
-async def test_event_socket_data(server):
+async def test_event_socket_data(server, esl):
     """Should call registered handler for events."""
-    esl = InboundESL('127.0.0.1', 8022, "ClueCon")
     esl.log = False
 
     def on_log(event):
@@ -245,9 +237,8 @@ async def test_event_socket_data(server):
 
 
 @pytest.mark.anyio
-async def test_event_with_multiline_channel_variables_content(server):
+async def test_event_with_multiline_channel_variables_content(server, esl):
     """Should not break parse from ESL Event when."""
-    esl = InboundESL('127.0.0.1', 8022, "ClueCon")
     def on_channel_create(self, event):
         self.channel_create = True
         self.parsed_event = event

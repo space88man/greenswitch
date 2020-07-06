@@ -78,10 +78,9 @@ class ESLProtocol(object):
         self._run = True
         self._EOL = b"\n"
         self._commands_sent = []
-        self._auth_request_event = create_event()
+        self._auth_request_event = None
         self.event_handlers = {}
-        self._esl_queue = create_queue(0)
-        self._process_esl_event_queue = True
+        self._esl_queue = None
         self._lingering = False
         self.connected = False
         self.client: SocketStream = None
@@ -255,6 +254,8 @@ class InboundESL(ESLProtocol):
         # LOG.info("Starting InboundESL with %s", self.stream.socket.getpeername())
         # order of context managers is important here, as we must block in the
         # task group before the socket cleanup
+        self._esl_queue = create_queue(0)
+        self._auth_request_event = create_event()
         async with await connect_tcp(self.host, self.port) as self.client, create_task_group() as self.tg:
 
             self.connected = True

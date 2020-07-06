@@ -5,10 +5,14 @@ from trioswitch import InboundESL
 
 @pytest.fixture
 def server():
-
     server = FakeESLServer('0.0.0.0', 8022, 'ClueCon')
     return server
     # await server.stop()
+
+
+@pytest.fixture
+def esl():
+    return InboundESL('127.0.0.1', 8022, 'ClueCon')
 
 
 class FakeESLServer(object):

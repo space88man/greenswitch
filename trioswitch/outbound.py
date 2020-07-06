@@ -1,5 +1,5 @@
 import logging
-from anyio import create_task_group, create_tcp_server
+from anyio import create_task_group, create_tcp_server, create_queue
 from anyio import Stream
 from .esl import ESLProtocol, AsyncResult, session_id
 
@@ -35,6 +35,8 @@ class OutboundSession(ESLProtocol):
             session_id.get(),
             self.client.peer_address,
         )
+
+        self._esl_queue = create_queue(0)
 
         async with create_task_group() as self.tg:
             await self.tg.spawn(self.receive_events)
