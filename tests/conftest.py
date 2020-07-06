@@ -77,7 +77,7 @@ class FakeESLServer(object):
         elif request in self.commands:
             data = self.commands.get(request)
             if request.startswith('api'):
-                self.api_response(client, data)
+                await self.api_response(client, data)
             else:
                 await self.command_reply(client, data)
         else:

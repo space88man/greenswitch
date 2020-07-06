@@ -440,3 +440,59 @@ async def test_event_with_multiline_channel_variables_content(server, esl):
 
     print("==== asserts test_event_with_multiline_channel_variables_content ====")
     assert esl.parsed_event.headers['variable_switch_r_sdp'] == expected_variable_value
+
+
+@pytest.mark.anyio
+async def test_api_response(server, esl):
+    """Should properly read api response from ESL."""
+    async with create_task_group() as tg:
+        await tg.spawn(server.start_server)
+        await sleep(0.1)
+        await tg.spawn(esl.run_inbound)
+        await sleep(0.1)
+
+        response = await (await esl.send('api khomp show links concise'))
+        await esl.stop()
+        await server.stop()
+
+    print("==== test_api_response ==== ")
+    assert 'api/response' == response.headers['Content-Type']
+    assert 'Content-Length' in response.headers
+    assert len(response.data) == int(response.headers['Content-Length'])
+
+
+@pytest.mark.anyio
+async def test_command_not_found(server, esl):
+    """Should properly read command response from ESL."""
+    async with create_task_group() as tg:
+        await tg.spawn(server.start_server)
+        await sleep(0.1)
+        await tg.spawn(esl.run_inbound)
+        await sleep(0.1)
+
+        response = await (await esl.send('unknown_command'))
+        await esl.stop()
+        await server.stop()
+
+
+    print("==== test_command_not_found ==== ")
+    assert 'command/reply' == response.headers['Content-Type']
+    assert '-ERR command not found' ==  response.headers['Reply-Text']
+
+
+@pytest.mark.anyio
+async def test_event_without_handler(server, esl):
+    """Should not break if receive an event without handler."""
+    async with create_task_group() as tg:
+        await tg.spawn(server.start_server)
+        await sleep(0.1)
+        await tg.spawn(esl.run_inbound)
+        await sleep(0.1)
+
+        await server.fake_event_plain(server.clients[0], 'Event-Name: EVENT_UNKNOWN'.encode())
+        await sleep(0.1)
+
+        print("==== test_command_not_found ==== ")
+        assert esl.connected
+        await esl.stop()
+        await server.stop()
