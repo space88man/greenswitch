@@ -80,7 +80,7 @@ class ESLProtocol(object):
         self._commands_sent = []
         self._auth_request_event = None
         self.event_handlers = {}
-        self._esl_queue = None
+        self._esl_event_queue = None
         self._lingering = False
         self.connected = False
         self.client: SocketStream = None
@@ -112,6 +112,7 @@ class ESLProtocol(object):
             except Exception:
                 self._run = False
                 self.connected = False
+                await self.client.close()
                 LOG.exception("Exception in receive_events()")
                 break
 
@@ -154,7 +155,7 @@ class ESLProtocol(object):
             # and outbound socket modes.
             # This is useful for outbound mode to notify all remaining
             # waiting commands to stop blocking and send a NotConnectedError
-            await self._esl_queue.put(event)
+            await self._esl_event_queue.put(event)
         elif event.headers["Content-Type"] == "text/rude-rejection":
             self.connected = False
             length = int(event.headers["Content-Length"])
@@ -171,10 +172,9 @@ class ESLProtocol(object):
                     event.headers.update(json.loads(data))
                 else:
                     event.parse_data(data)
-            await self._esl_queue.put(event)
+            await self._esl_event_queue.put(event)
 
     async def process_one_event(self, handlers, event):
-
         if hasattr(self, "before_handle"):
             await self._safe_exec_handler(self.before_handle, event)
 
@@ -195,7 +195,8 @@ class ESLProtocol(object):
     async def process_events(self):
         LOG.debug("Event processor running")
 
-        async for event in self._esl_queue:
+        async for event in self._esl_event_queue:
+
             if not self._run:
                 break
 
@@ -231,7 +232,7 @@ class ESLProtocol(object):
     async def stop(self):
         if self.connected:
             try:
-                await self.send("exit")
+                await (await self.send("exit"))
             except (NotConnectedError,):
                 pass
             finally:
@@ -254,7 +255,7 @@ class InboundESL(ESLProtocol):
         # LOG.info("Starting InboundESL with %s", self.stream.socket.getpeername())
         # order of context managers is important here, as we must block in the
         # task group before the socket cleanup
-        self._esl_queue = create_queue(0)
+        self._esl_event_queue = create_queue(0)
         self._auth_request_event = create_event()
         async with await connect_tcp(self.host, self.port) as self.client, create_task_group() as self.tg:
 

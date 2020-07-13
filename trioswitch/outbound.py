@@ -36,7 +36,7 @@ class OutboundSession(ESLProtocol):
             self.client.peer_address,
         )
 
-        self._esl_queue = create_queue(0)
+        self._esl_event_queue = create_queue(0)
 
         async with create_task_group() as self.tg:
             await self.tg.spawn(self.receive_events)
